@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/python -m jukyu.*)",
+      "Bash(.venv/bin/python run_daily.py *)",
+      "Bash(.venv/bin/python tools/validate_data.py *)",
+      "Bash(.venv/bin/python -m pip install -r requirements*.txt)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Skill(daily-plan *)",
+      "Skill(backtest *)",
+      "Skill(import-data *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * --data*)",
+      "Bash(curl * -d *)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}

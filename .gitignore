@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+mlruns/
+liander_dataset/
+output/
+# 実データは原則コミットしない（サンプルのみ許可）
+data/*
+!data/sample_30min.csv
+.env
+.env.*
+.claude/settings.local.json

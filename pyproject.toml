@@ -1,0 +1,10 @@
+[project]
+name = "jukyu"
+version = "0.1.0"
+description = "新電力向け 需給管理プロトタイプ（OpenSTEF）"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]

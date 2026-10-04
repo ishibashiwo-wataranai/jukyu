@@ -1,0 +1,370 @@
+<title>需給管理ボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 運用コンソール。上に対象日の切替とKPI、中央に48コマのチャート、下に明細表。 */
+:root {
+  --bg: #f5f6f4;
+  --panel: #ffffff;
+  --ink: #16191d;
+  --ink-2: #4c5259;
+  --ink-3: #7b8188;
+  --line: #dfe2e0;
+  --accent: #0f5c7a;
+  --accent-soft: #e2eef2;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --band: rgba(42,120,214,.16);
+  --actual: #16191d;
+  --surplus: #2a78d6; --shortage: #e34948;
+  --good: #1f7a3a; --warn: #a86300; --crit: #c23434;
+  --f-ui: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121518; --panel: #1a1e22; --ink: #eef1f3; --ink-2: #b4bbc2; --ink-3: #848b93; --line: #2c3238;
+    --accent: #6cc0dc; --accent-soft: #1d3540;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --band: rgba(57,135,229,.22); --actual: #eef1f3;
+    --surplus: #3987e5; --shortage: #e66767;
+    --good: #5cc27a; --warn: #e3a53c; --crit: #ef7b7b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121518; --panel: #1a1e22; --ink: #eef1f3; --ink-2: #b4bbc2; --ink-3: #848b93; --line: #2c3238;
+  --accent: #6cc0dc; --accent-soft: #1d3540;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --band: rgba(57,135,229,.22); --actual: #eef1f3;
+  --surplus: #3987e5; --shortage: #e66767;
+  --good: #5cc27a; --warn: #e3a53c; --crit: #ef7b7b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 14px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+.meta { color: var(--ink-2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.meta b { color: var(--ink); font-weight: 700; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+
+.days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.day { flex: 0 0 auto; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
+  padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 74px; }
+.day:hover { border-color: var(--accent); }
+.day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.day[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.day .d { font-family: var(--f-num); font-size: 12px; }
+.day .tag { font-size: 11px; color: var(--ink-3); }
+.day.plan .tag { color: var(--accent); font-weight: 700; }
+.day .mape { font-family: var(--f-num); font-size: 11px; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid currentColor; }
+.status.plan { color: var(--accent); }
+.status.done { color: var(--ink-2); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.kpi { background: var(--panel); padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.kpi .k { font-size: 12px; color: var(--ink-2); letter-spacing: .04em; }
+.kpi .v { font-family: var(--f-num); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.kpi .v small { font-family: var(--f-ui); font-size: 12px; color: var(--ink-3); margin-left: 3px; font-weight: 400; }
+.kpi .v.good { color: var(--good); } .kpi .v.warn { color: var(--warn); } .kpi .v.crit { color: var(--crit); }
+.kpi .sub { font-size: 11px; color: var(--ink-3); }
+
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.panel h2 { font-size: 15px; margin: 0; }
+.panel .desc { margin: 0; color: var(--ink-2); font-size: 12px; max-width: 70ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.line { height: 2px; border-radius: 1px; }
+.sw.dash { height: 0; border-top: 2px dashed; background: none !important; }
+.chart { position: relative; height: 300px; }
+.chart.short { height: 220px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } .chart { height: 260px; } }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 460px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { padding: 5px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--panel); color: var(--ink-2); font-weight: 700; z-index: 1; }
+td { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+td.l, th.l { text-align: left; }
+tr.peak td { background: var(--accent-soft); }
+td.neg { color: var(--shortage); } td.pos { color: var(--surplus); }
+tbody tr { cursor: default; }
+.bt tbody tr { cursor: pointer; }
+.bt tbody tr:hover td { background: var(--accent-soft); }
+.bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--s1); vertical-align: middle; margin-left: 6px; }
+
+.note { font-size: 12px; color: var(--ink-2); border-left: 3px solid var(--line); padding-left: 12px; display: grid; gap: 4px; max-width: 90ch; }
+.note p { margin: 0; }
+.toggle { display: flex; gap: 6px; }
+.toggle button { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div style="display:grid;gap:4px;min-width:0">
+      <h1 id="title">需給管理ボード</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <span class="status" id="status"></span>
+  </header>
+
+  <nav class="days" id="days" aria-label="対象日"></nav>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="panel">
+    <div class="row">
+      <h2>需要予測と需要計画（30分平均 kW）</h2>
+      <div class="legend" id="lg-demand"></div>
+    </div>
+    <p class="desc" id="demand-desc"></p>
+    <div class="chart"><canvas id="c-demand" aria-label="48コマの需要予測、需要計画、需要実績"></canvas></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="row"><h2>調達計画の内訳（kW）</h2></div>
+      <div class="legend" id="lg-supply"></div>
+      <div class="chart short"><canvas id="c-supply" aria-label="電源別の調達計画"></canvas></div>
+    </section>
+    <section class="panel" id="p-imb">
+      <div class="row"><h2>インバランス（kWh／コマ）</h2></div>
+      <div class="legend" id="lg-imb"></div>
+      <div class="chart short"><canvas id="c-imb" aria-label="コマ別インバランス量"></canvas></div>
+      <p class="desc" id="imb-empty" hidden>翌日計画のため実績はまだありません。当日の30分値が入ると、ここに計画との差（インバランス）が表示されます。</p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="row">
+      <h2>48コマ明細</h2>
+      <div class="toggle" role="group" aria-label="単位">
+        <button type="button" id="u-kw" aria-pressed="true">kW</button>
+        <button type="button" id="u-kwh" aria-pressed="false">kWh</button>
+      </div>
+    </div>
+    <div class="tablewrap"><table id="t-slots"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>検証期間の成績</h2>
+    <p class="desc">行を選ぶとその日の計画と実績を表示します。損失は「予測が完全に当たっていた場合」との差額（簡易モデル）。</p>
+    <div class="tablewrap" style="max-height:none"><table class="bt" id="t-bt"></table></div>
+  </section>
+
+  <div class="note" id="note"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const DATA = /*__DATA__*/null;
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 0) => v == null || Number.isNaN(v) ? "—" : Number(v).toLocaleString("ja-JP", { minimumFractionDigits: d, maximumFractionDigits: d });
+const SUPPLY_COLORS = ["--s1", "--s2", "--s3", "--s4"];
+let current = DATA.days.length - 1;
+let unit = "kw";
+const charts = {};
+
+function el(tag, attrs = {}, html = "") {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  e.innerHTML = html;
+  return e;
+}
+
+function renderDays() {
+  const nav = document.getElementById("days");
+  nav.innerHTML = "";
+  DATA.days.forEach((d, i) => {
+    const plan = !d.has_actual;
+    const b = el("button", { type: "button", class: "day" + (plan ? " plan" : ""), "aria-pressed": String(i === current) },
+      `<span class="tag">${plan ? "翌日計画" : "検証"}</span><span class="d">${d.date.slice(5).replace("-", "/")}(${d.weekday})</span>` +
+      (plan ? `<span class="mape">&nbsp;</span>` : `<span class="mape">誤差 ${fmt(d.summary["MAPE_%"], 1)}%</span>`));
+    b.addEventListener("click", () => { current = i; render(); });
+    nav.appendChild(b);
+  });
+  nav.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function kpi(k, v, unitTxt, cls = "", sub = "") {
+  return `<div class="kpi"><span class="k">${k}</span><span class="v ${cls}">${v}<small>${unitTxt}</small></span>${sub ? `<span class="sub">${sub}</span>` : ""}</div>`;
+}
+
+function renderHeader(d) {
+  document.getElementById("meta").innerHTML =
+    `<span>BG <b>${DATA.bg_name}</b></span><span>${DATA.area}</span><span>予測モデル <b class="num">OpenSTEF / ${DATA.model}</b></span><span>入札基準 <b class="num">P${Math.round(DATA.bid_quantile * 100)}</b></span>`;
+  const st = document.getElementById("status");
+  st.className = "status " + (d.has_actual ? "done" : "plan");
+  st.textContent = d.has_actual ? `${d.date}（${d.weekday}）実績あり・検証` : `${d.date}（${d.weekday}）翌日計画・前日9:00作成`;
+}
+
+function renderKpis(d) {
+  const s = d.summary;
+  let h = kpi("需要計画", fmt(s["需要計画_MWh"], 1), "MWh") +
+    kpi("最大需要計画", fmt(s["最大需要計画_kW"]), "kW") +
+    kpi("JEPXスポット買", fmt(s["JEPX買入札_MWh"], 1), "MWh", "", `売 ${fmt(s["JEPX売入札_MWh"], 1)} MWh`) +
+    kpi("スポット調達費", fmt(s["スポット調達費_万円"], 1), "万円", "", "約定価格×買−売");
+  if (d.has_actual) {
+    const m = s["MAPE_%"];
+    const cls = m < 4 ? "good" : m < 7 ? "warn" : "crit";
+    const lbl = m < 4 ? "良好" : m < 7 ? "要注意" : "要対策";
+    h += kpi("予測誤差 MAPE", fmt(m, 2), "%", cls, `判定：${lbl}`) +
+      kpi("不足インバランス", fmt(s["不足インバランス_MWh"], 1), "MWh", s["不足インバランス_MWh"] > 20 ? "crit" : "", `余剰 ${fmt(s["余剰インバランス_MWh"], 1)} MWh`) +
+      kpi("インバランス損失", fmt(s["インバランス損失_万円"], 1), "万円", "", `精算 ${fmt(s["インバランス精算_万円"], 1)} 万円`);
+  }
+  document.getElementById("kpis").innerHTML = h;
+}
+
+function baseOptions(yTitle) {
+  const ink2 = css("--ink-2"), line = css("--line");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: css("--panel"), titleColor: css("--ink"), bodyColor: css("--ink"), borderColor: line, borderWidth: 1,
+        titleFont: { family: css("--f-num") }, bodyFont: { family: css("--f-num") }, padding: 10,
+        callbacks: { label: c => c.raw == null ? null : `${c.dataset.label}: ${fmt(c.raw)} ${c.dataset.unit || ""}` },
+        filter: c => c.dataset.label && !c.dataset.label.startsWith("_"),
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: ink2, font: { family: css("--f-num"), size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 9 }, border: { color: line } },
+      y: { grid: { color: line }, ticks: { color: ink2, font: { family: css("--f-num"), size: 11 }, callback: v => fmt(v) }, border: { display: false },
+        title: { display: !!yTitle, text: yTitle, color: ink2, font: { size: 11 } } },
+    },
+  };
+}
+
+function labels(d) { return d.slots.map(s => s.slice(0, 5)); }
+
+function legend(id, items) {
+  document.getElementById(id).innerHTML = items.map(([name, color, kind]) =>
+    `<span><i class="sw ${kind || ""}" style="${kind === "dash" ? `border-color:${color}` : `background:${color}`}"></i>${name}</span>`).join("");
+}
+
+function drawDemand(d) {
+  const s1 = css("--s1"), band = css("--band"), act = css("--actual");
+  const ds = [
+    { label: "_p90", data: d.p90, borderWidth: 0, pointRadius: 0, fill: "+1", backgroundColor: band },
+    { label: "_p10", data: d.p10, borderWidth: 0, pointRadius: 0, fill: false },
+    { label: "予測 P90", data: d.p90, borderWidth: 0, pointRadius: 0, unit: "kW", hidden: false, borderColor: "transparent" },
+    { label: "予測 P10", data: d.p10, borderWidth: 0, pointRadius: 0, unit: "kW", borderColor: "transparent" },
+    { label: "需要計画", data: d.demand_plan, borderColor: s1, borderWidth: 2, pointRadius: 0, unit: "kW", tension: .25 },
+  ];
+  if (d.has_actual) ds.push({ label: "需要実績", data: d.actual, borderColor: act, borderWidth: 2, borderDash: [5, 4], pointRadius: 0, unit: "kW", tension: .25 });
+  const items = [["予測幅 P10–P90", band], ["需要計画（入札基準）", s1, "line"]];
+  if (d.has_actual) items.push(["需要実績", act, "dash"]);
+  legend("lg-demand", items);
+  const peakIdx = d.demand_plan.indexOf(Math.max(...d.demand_plan));
+  document.getElementById("demand-desc").textContent =
+    `ピークは ${d.slots[peakIdx]}（${fmt(d.demand_plan[peakIdx])} kW）。帯は予測の不確かさで、実績の80%がこの幅に入る想定です。`;
+  charts.demand?.destroy();
+  charts.demand = new Chart(document.getElementById("c-demand"), { type: "line", data: { labels: labels(d), datasets: ds }, options: baseOptions("kW") });
+}
+
+function drawSupply(d) {
+  const names = DATA.supply_names;
+  const ds = names.map((n, i) => ({ label: n, data: d.supply[n], backgroundColor: css(SUPPLY_COLORS[i % 4]), stack: "s", unit: "kW", borderColor: css("--panel"), borderWidth: { top: 1 }, barPercentage: 1, categoryPercentage: .9 }));
+  const jColor = css(SUPPLY_COLORS[names.length % 4]);
+  ds.push({ label: "JEPXスポット買", data: d.jepx_buy, backgroundColor: jColor, stack: "s", unit: "kW", borderColor: css("--panel"), borderWidth: { top: 1 }, barPercentage: 1, categoryPercentage: .9 });
+  ds.push({ label: "JEPXスポット売", data: d.jepx_sell.map(v => v ? -v : 0), backgroundColor: css("--ink-3"), stack: "s", unit: "kW", barPercentage: 1, categoryPercentage: .9 });
+  ds.push({ type: "line", label: "需要計画", data: d.demand_plan, borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, unit: "kW", tension: .25 });
+  legend("lg-supply", [...names.map((n, i) => [n, css(SUPPLY_COLORS[i % 4])]), ["JEPXスポット買", jColor], ["スポット売（マイナス表示）", css("--ink-3")], ["需要計画", css("--ink"), "line"]]);
+  const o = baseOptions("kW");
+  o.scales.x.stacked = true; o.scales.y.stacked = true;
+  charts.supply?.destroy();
+  charts.supply = new Chart(document.getElementById("c-supply"), { type: "bar", data: { labels: labels(d), datasets: ds }, options: o });
+}
+
+function drawImb(d) {
+  const canvas = document.getElementById("c-imb");
+  const empty = document.getElementById("imb-empty");
+  charts.imb?.destroy();
+  if (!d.has_actual) { canvas.parentElement.hidden = true; empty.hidden = false; document.getElementById("lg-imb").innerHTML = ""; return; }
+  canvas.parentElement.hidden = false; empty.hidden = true;
+  const sur = css("--surplus"), sho = css("--shortage");
+  legend("lg-imb", [["余剰（調達＞実績）", sur], ["不足（調達＜実績）", sho]]);
+  const o = baseOptions("kWh");
+  charts.imb = new Chart(canvas, {
+    type: "bar",
+    data: { labels: labels(d), datasets: [{ label: "インバランス", data: d.imbalance_kwh, unit: "kWh", backgroundColor: d.imbalance_kwh.map(v => v >= 0 ? sur : sho), barPercentage: 1, categoryPercentage: .85, borderRadius: 2 }] },
+    options: o,
+  });
+}
+
+function renderTable(d) {
+  const k = unit === "kwh" ? 0.5 : 1, u = unit === "kwh" ? "kWh" : "kW";
+  const names = DATA.supply_names;
+  const peakIdx = d.demand_plan.indexOf(Math.max(...d.demand_plan));
+  let h = `<thead><tr><th class="l">コマ</th><th class="l">時刻帯</th><th>需要計画 ${u}</th><th>P10</th><th>P90</th>` +
+    names.map(n => `<th>${n}</th>`).join("") + `<th>JEPX買</th><th>JEPX売</th><th>スポット 円/kWh</th>` +
+    (d.has_actual ? `<th>需要実績 ${u}</th><th>インバランス kWh</th>` : "") + `</tr></thead><tbody>`;
+  d.slots.forEach((s, i) => {
+    const imb = d.has_actual ? d.imbalance_kwh[i] : null;
+    h += `<tr class="${i === peakIdx ? "peak" : ""}"><td class="l">${i + 1}</td><td class="l">${s}</td><td>${fmt(d.demand_plan[i] * k)}</td><td>${fmt(d.p10[i] * k)}</td><td>${fmt(d.p90[i] * k)}</td>` +
+      names.map(n => `<td>${fmt(d.supply[n][i] * k)}</td>`).join("") +
+      `<td>${fmt(d.jepx_buy[i] * k)}</td><td>${fmt(d.jepx_sell[i] * k)}</td><td>${fmt(d.spot?.[i], 2)}</td>` +
+      (d.has_actual ? `<td>${fmt(d.actual[i] * k)}</td><td class="${imb < 0 ? "neg" : "pos"}">${imb > 0 ? "+" : ""}${fmt(imb)}</td>` : "") + `</tr>`;
+  });
+  document.getElementById("t-slots").innerHTML = h + "</tbody>";
+}
+
+function renderBacktest() {
+  const rows = DATA.days.filter(d => d.has_actual);
+  const maxLoss = Math.max(...rows.map(d => d.summary["インバランス損失_万円"]));
+  let h = `<thead><tr><th class="l">日付</th><th>需要実績 MWh</th><th>MAPE %</th><th>不足 MWh</th><th>余剰 MWh</th><th class="l">インバランス損失 万円</th></tr></thead><tbody>`;
+  rows.forEach(d => {
+    const s = d.summary, i = DATA.days.indexOf(d);
+    h += `<tr data-i="${i}" tabindex="0"><td class="l">${d.date}（${d.weekday}）</td><td>${fmt(s["需要実績_MWh"], 1)}</td><td>${fmt(s["MAPE_%"], 2)}</td><td>${fmt(s["不足インバランス_MWh"], 1)}</td><td>${fmt(s["余剰インバランス_MWh"], 1)}</td>` +
+      `<td class="l">${fmt(s["インバランス損失_万円"], 1).padStart(5, " ")}<span class="bar" style="width:${(s["インバランス損失_万円"] / maxLoss * 120).toFixed(0)}px"></span></td></tr>`;
+  });
+  const tot = rows.reduce((a, d) => a + d.summary["インバランス損失_万円"], 0);
+  const avg = rows.reduce((a, d) => a + d.summary["MAPE_%"], 0) / rows.length;
+  h += `</tbody><tfoot><tr><td class="l"><b>${rows.length}日間</b></td><td></td><td><b>${fmt(avg, 2)}</b>（平均）</td><td></td><td></td><td class="l"><b>${fmt(tot, 1)}</b>（合計）</td></tr></tfoot>`;
+  const t = document.getElementById("t-bt");
+  t.innerHTML = h;
+  t.querySelectorAll("tbody tr").forEach(tr => {
+    const go = () => { current = +tr.dataset.i; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    tr.addEventListener("click", go);
+    tr.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  });
+}
+
+function renderNote() {
+  document.getElementById("note").innerHTML = `
+    <p><b>このボードはサンプルデータで動いています。</b>需要・気象・JEPX価格は検証用に合成した値で、実在の事業者のものではありません。</p>
+    <p>インバランス単価は「スポット価格×係数（不足1.3／余剰0.7）」の簡易モデルです。実際の精算はインバランス料金の算定式に従うため一致しません。</p>
+    <p>計画CSVは社内確認用の簡易様式です。広域機関への提出は所定の様式に変換して行ってください。</p>`;
+}
+
+function render() {
+  const d = DATA.days[current];
+  renderDays(); renderHeader(d); renderKpis(d);
+  drawDemand(d); drawSupply(d); drawImb(d); renderTable(d);
+}
+
+["kw", "kwh"].forEach(u => document.getElementById("u-" + u).addEventListener("click", () => {
+  unit = u;
+  document.getElementById("u-kw").setAttribute("aria-pressed", String(u === "kw"));
+  document.getElementById("u-kwh").setAttribute("aria-pressed", String(u === "kwh"));
+  renderTable(DATA.days[current]);
+}));
+
+renderBacktest(); renderNote(); render();
+const mq = matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener?.("change", render);
+new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>

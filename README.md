@@ -37,6 +37,8 @@ python run_daily.py --date 2026-10-05 --backtest-days 14
 python -m jukyu.dashboard output/results.json output/dashboard.html
 ```
 
+GitHub Pages では `docs/index.html` を公開しています（サンプルデータの結果）。更新するときは `python -m jukyu.dashboard output/results.json docs/index.html` で作り直してコミットします。実データの結果は `docs/` に置かないでください。
+
 1日分の学習・予測はCPUで7秒前後です。`--model gblinear` で別モデルも試せます（サンプルでは xgboost の方が祝日に強く、精度が高い結果でした）。
 
 ## Claude Code で使う

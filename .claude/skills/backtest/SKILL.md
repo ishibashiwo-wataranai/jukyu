@@ -18,13 +18,14 @@ allowed-tools: Bash(.venv/bin/python run_daily.py *) Bash(.venv/bin/python -c *)
    ```
    .venv/bin/python run_daily.py --date <日付> --backtest-days <日数> --model <モデル> --out output/bt_<モデル>
    ```
-2. 各 `output/bt_<モデル>/results.json` の `days[].summary` から、検証日（`has_actual: true`）について集計する:
+   全エリアが対象になる。1エリアだけにするときは `--area <エリア>` を付ける。
+2. 各 `output/bt_<モデル>/results.json` の `areas[].days[].summary` から、検証日（`has_actual: true`）についてエリアごとに集計する（エリアをまたいで平均しない）:
    平均MAPE、最大MAPEの日、不足・余剰インバランス合計（MWh）、インバランス損失合計（万円）。
-3. 入札基準分位点の比較を頼まれた場合は、`jukyu/config.py` の `PlanningConfig.bid_quantile` を変えて実行する。終わったら元の値に戻し、戻したことを報告する。
+3. 入札基準分位点の比較を頼まれた場合は、`jukyu/config.py` の該当エリアの `PlanningConfig.bid_quantile` を変えて実行する。終わったら元の値に戻し、戻したことを報告する。
 
 ## 報告の形
 
-- モデル（または設定）ごとの集計表
+- エリア別・モデル（または設定）ごとの集計表
 - 曜日・祝日別に誤差が大きい日の傾向
 - どれを採用すべきかの提案と、その理由（損失合計を主、MAPEを従に見る）
 - サンプルデータの場合はその旨

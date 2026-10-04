@@ -14,10 +14,12 @@ TZ = "Asia/Tokyo"
 class AreaConfig:
     """供給エリア（予測の祝日・座標に使用）。"""
 
+    key: str = "tokyo"                          # コマンドライン・出力フォルダ用の識別子
     name: str = "東京エリア"
     latitude: float = 35.68
     longitude: float = 139.76
     country_code: str = "JP"
+    data_path: str = "data/sample_30min.csv"    # このエリアの30分値データ
 
 
 @dataclass
@@ -56,7 +58,9 @@ class PlanningConfig:
 
 @dataclass
 class Settings:
-    bg_name: str = "サンプル新電力BG"
+    """1エリア分の設定。同時同量の計画はエリア（BG）ごとに立てる。"""
+
+    bg_name: str = "サンプル新電力 東京BG"
     area: AreaConfig = field(default_factory=AreaConfig)
     contracts: list[ContractConfig] = field(
         default_factory=lambda: [
@@ -69,4 +73,25 @@ class Settings:
     quantiles: tuple[float, ...] = (0.1, 0.5, 0.9)
 
 
-SETTINGS = Settings()
+# 管理するエリア。追加するときはここに Settings を足し、data_path のデータを用意する。
+AREAS: dict[str, Settings] = {
+    "tokyo": Settings(),
+    "tohoku": Settings(
+        bg_name="サンプル新電力 東北BG",
+        # 座標は岩手県陸前高田市付近（気象・日射の地点）
+        area=AreaConfig(
+            key="tohoku",
+            name="東北エリア",
+            latitude=39.02,
+            longitude=141.63,
+            data_path="data/sample_tohoku_30min.csv",
+        ),
+        contracts=[
+            ContractConfig(name="相対契約A（ベース）", kw_day=7_000, kw_night=7_000),
+            ContractConfig(name="相対契約B（昼間）", kw_day=3_000, kw_night=0),
+        ],
+        solar=SolarConfig(capacity_kw=6_000.0),
+    ),
+}
+
+SETTINGS = AREAS["tokyo"]   # エリアを指定しない処理の既定値

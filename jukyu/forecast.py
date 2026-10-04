@@ -69,7 +69,7 @@ def forecast_next_day(
 
     area = settings.area
     config = ForecastingWorkflowConfig(
-        model_id=f"jukyu_{model}",
+        model_id=f"jukyu_{area.key}_{model}",
         model=model,
         sample_interval=timedelta(minutes=SLOT_MINUTES),
         horizons=[LeadTime.from_string(f"PT{horizon_hours}H")],

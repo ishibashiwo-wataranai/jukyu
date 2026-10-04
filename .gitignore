@@ -8,6 +8,7 @@ output/
 # 実データは原則コミットしない（サンプルのみ許可）
 data/*
 !data/sample_30min.csv
+!data/sample_tohoku_30min.csv
 .env
 .env.*
 .claude/settings.local.json

@@ -32,13 +32,15 @@ allowed-tools: Bash(.venv/bin/python tools/validate_data.py *) Bash(.venv/bin/py
    - 時刻が「コマ終了時刻」（例 0:30 が1コマ目）なら30分引いて開始時刻にする。「24:00」表記は翌日0:00に直す。
    - 気象が1時間値なら30分に線形補間する（日射量は0未満にしない）。
    - JEPX のエリアプライスは対象エリアの列を使う。
+   - **エリアごとに別ファイルにする**（東京と東北のデータを1ファイルに混ぜない）。どのエリアのデータかをユーザーに確認する。
 3. 変換スクリプトは `tools/convert_<データ名>.py` として保存し、何度でも再実行できるようにする。
 4. 検証する:
    ```
    .venv/bin/python tools/validate_data.py data/<名前>_30min.csv
    ```
    エラーがなくなるまで直す。警告（欠損コマ、外れ値）は内容をユーザーに報告して判断を仰ぐ。
-5. 最後に `--backtest-days 3` で動作確認する（`/daily-plan` または `/backtest`）。
+5. `jukyu/config.py` の該当エリアの `AreaConfig.data_path` を新しいファイルに向けるか、`run_daily.py --area <エリア> --data <path>` で指定する。
+6. 最後に `--backtest-days 3` で動作確認する（`/daily-plan` または `/backtest`）。
 
 ## 注意
 

@@ -2,7 +2,7 @@
 
 翌日の30分×48コマについて、需要予測 → 調達計画 → JEPXスポット入札量 → インバランス評価 → 計画CSV出力 までを一通り行う検証用のプロトタイプです。需要予測エンジンに [OpenSTEF](https://github.com/OpenSTEF/openstef) v4 を使っています。
 
-同梱のデータは**合成したサンプル**（東京エリア、高圧業務用中心、最大需要およそ5万kW）です。実データに差し替えて使うことを前提にしています。
+東京エリアと東北エリアの2エリアを、エリア（BG）ごとに別々に計画します。同梱のデータは**合成したサンプル**です（東京エリア：高圧業務用中心、最大需要およそ5万kW／東北エリア：陸前高田付近の気候を想定、冬ピーク、最大需要およそ2万kW）。実データに差し替えて使うことを前提にしています。
 
 ## できること
 
@@ -28,9 +28,10 @@ pip install -r requirements.txt
 
 ```bash
 # 1. サンプルデータを作る（実データがあれば不要）
-python -m jukyu.sample_data data/sample_30min.csv
+python -m jukyu.sample_data data/sample_30min.csv tokyo
+python -m jukyu.sample_data data/sample_tohoku_30min.csv tohoku
 
-# 2. 翌日計画＋過去14日の検証
+# 2. 全エリアの翌日計画＋過去14日の検証（1エリアだけなら --area tohoku など）
 python run_daily.py --date 2026-10-05 --backtest-days 14
 
 # 3. ダッシュボードを作る（ブラウザで開く）
@@ -55,7 +56,7 @@ GitHub Pages では `docs/index.html` を公開しています（サンプルデ
 
 ## 実データへの差し替え
 
-`data/` に次の列を持つ30分間隔のCSVを置き、`--data` で指定します。
+`data/` にエリアごとに次の列を持つ30分間隔のCSVを置き、`jukyu/config.py` の `AreaConfig.data_path` に指定します（または `--area <エリア> --data <path>`）。
 
 | 列 | 内容 | 入手先の例 |
 |---|---|---|
@@ -72,7 +73,7 @@ GitHub Pages では `docs/index.html` を公開しています（サンプルデ
 
 - **気象は「予報値」を使ってください。** 学習・予測のどちらも、その時点で手に入る予報で揃えると、本番と同じ条件で精度を測れます。サンプルでは実績値を使っているため、精度が実運用より良く出ます。
 - 需要実績が予測時点（前日9:00）までにどこまで届くかは契約・エリアによって違います。遅れがある場合は `forecast.py` の `issue_time` 以降を欠損にしている処理を、実際の到着時刻に合わせて調整してください。
-- 電源構成（相対契約・太陽光の容量）や入札方針は `jukyu/config.py` で変更します。
+- 電源構成（相対契約・太陽光の容量）や入札方針は `jukyu/config.py` の `AREAS` でエリアごとに変更します。エリアを増やすときも `AREAS` に足します。
 
 ## 制度面で未実装の部分（本番化で必要）
 
@@ -88,7 +89,7 @@ GitHub Pages では `docs/index.html` を公開しています（サンプルデ
 
 ```
 run_daily.py               日次実行（予測→計画→評価→出力）
-jukyu/config.py            BG・電源構成・入札方針の設定
+jukyu/config.py            エリアごとのBG・電源構成・入札方針の設定
 jukyu/sample_data.py       サンプルデータ生成
 jukyu/forecast.py          OpenSTEFによる48コマ予測
 jukyu/planning.py          調達計画・JEPX入札量・インバランス評価

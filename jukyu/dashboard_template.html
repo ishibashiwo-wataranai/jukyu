@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: 運用コンソール。上に対象日の切替とKPI、中央に48コマのチャート、下に明細表。 */
+/* Layout: 運用コンソール。上にエリアと対象日の切替・KPI、中央に48コマのチャート、下に明細表。 */
 :root {
   --bg: #f5f6f4;
   --panel: #ffffff;
@@ -50,6 +50,17 @@ h1 { font-size: 22px; margin: 0; letter-spacing: .02em; text-wrap: balance; }
 .meta b { color: var(--ink); font-weight: 700; }
 .num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
 
+.areas { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.area { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 8px 14px;
+  font: inherit; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 150px; }
+.area:hover { border-color: var(--accent); }
+.area:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.area[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.area .n { font-weight: 700; font-size: 14px; }
+.area .bg { font-size: 11px; color: var(--ink-3); }
+.area .v { font-family: var(--f-num); font-size: 12px; color: var(--ink-2); }
+.areas .total { display: grid; gap: 2px; align-content: center; padding: 8px 4px; font-size: 12px; color: var(--ink-2); }
+.areas .total b { font-family: var(--f-num); font-weight: 500; color: var(--ink); }
 .days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
 .day { flex: 0 0 auto; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
   padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 74px; }
@@ -118,6 +129,8 @@ tbody tr { cursor: default; }
     <span class="status" id="status"></span>
   </header>
 
+  <nav class="areas" id="areas" aria-label="エリア"></nav>
+
   <nav class="days" id="days" aria-label="対象日"></nav>
 
   <div class="kpis" id="kpis"></div>
@@ -168,11 +181,15 @@ tbody tr { cursor: default; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const DATA = /*__DATA__*/null;
+// 1エリアだけの古い results.json も表示できるようにする
+const ROOT = DATA.areas ? DATA : { model: DATA.model, areas: [{ key: "default", ...DATA }] };
+let areaIdx = 0;
+let AREA = ROOT.areas[0];
 
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fmt = (v, d = 0) => v == null || Number.isNaN(v) ? "—" : Number(v).toLocaleString("ja-JP", { minimumFractionDigits: d, maximumFractionDigits: d });
 const SUPPLY_COLORS = ["--s1", "--s2", "--s3", "--s4"];
-let current = DATA.days.length - 1;
+let current = AREA.days.length - 1;
 let unit = "kw";
 const charts = {};
 
@@ -183,10 +200,42 @@ function el(tag, attrs = {}, html = "") {
   return e;
 }
 
+function renderAreas() {
+  const nav = document.getElementById("areas");
+  nav.innerHTML = "";
+  if (ROOT.areas.length < 2) { nav.hidden = true; return; }
+  const planOf = a => a.days.find(d => !d.has_actual);
+  ROOT.areas.forEach((a, i) => {
+    const p = planOf(a);
+    const b = el("button", { type: "button", class: "area", "aria-pressed": String(i === areaIdx) },
+      `<span class="n">${a.area}</span><span class="bg">${a.bg_name}</span>` +
+      `<span class="v">${p ? `翌日 ${fmt(p.summary["需要計画_MWh"], 1)} MWh／最大 ${fmt(p.summary["最大需要計画_kW"])} kW` : "&nbsp;"}</span>`);
+    b.addEventListener("click", () => selectArea(i));
+    nav.appendChild(b);
+  });
+  // 合計は参考値。計画・入札はエリアごとに行う
+  const plans = ROOT.areas.map(planOf).filter(Boolean);
+  if (plans.length === ROOT.areas.length && new Set(plans.map(p => p.date)).size === 1) {
+    const sum = k => plans.reduce((t, p) => t + (p.summary[k] || 0), 0);
+    nav.appendChild(el("div", { class: "total" },
+      `<span>全エリア合計（参考）${plans[0].date.slice(5).replace("-", "/")}</span>` +
+      `<span>需要計画 <b>${fmt(sum("需要計画_MWh"), 1)}</b> MWh　JEPX買 <b>${fmt(sum("JEPX買入札_MWh"), 1)}</b> MWh</span>`));
+  }
+}
+
+function selectArea(i) {
+  const date = AREA.days[current]?.date;
+  areaIdx = i;
+  AREA = ROOT.areas[i];
+  const same = AREA.days.findIndex(d => d.date === date);
+  current = same >= 0 ? same : AREA.days.length - 1;
+  renderBacktest(); render();
+}
+
 function renderDays() {
   const nav = document.getElementById("days");
   nav.innerHTML = "";
-  DATA.days.forEach((d, i) => {
+  AREA.days.forEach((d, i) => {
     const plan = !d.has_actual;
     const b = el("button", { type: "button", class: "day" + (plan ? " plan" : ""), "aria-pressed": String(i === current) },
       `<span class="tag">${plan ? "翌日計画" : "検証"}</span><span class="d">${d.date.slice(5).replace("-", "/")}(${d.weekday})</span>` +
@@ -203,7 +252,7 @@ function kpi(k, v, unitTxt, cls = "", sub = "") {
 
 function renderHeader(d) {
   document.getElementById("meta").innerHTML =
-    `<span>BG <b>${DATA.bg_name}</b></span><span>${DATA.area}</span><span>予測モデル <b class="num">OpenSTEF / ${DATA.model}</b></span><span>入札基準 <b class="num">P${Math.round(DATA.bid_quantile * 100)}</b></span>`;
+    `<span>BG <b>${AREA.bg_name}</b></span><span>${AREA.area}</span><span>予測モデル <b class="num">OpenSTEF / ${ROOT.model}</b></span><span>入札基準 <b class="num">P${Math.round(AREA.bid_quantile * 100)}</b></span>`;
   const st = document.getElementById("status");
   st.className = "status " + (d.has_actual ? "done" : "plan");
   st.textContent = d.has_actual ? `${d.date}（${d.weekday}）実績あり・検証` : `${d.date}（${d.weekday}）翌日計画・前日9:00作成`;
@@ -276,7 +325,7 @@ function drawDemand(d) {
 }
 
 function drawSupply(d) {
-  const names = DATA.supply_names;
+  const names = AREA.supply_names;
   const ds = names.map((n, i) => ({ label: n, data: d.supply[n], backgroundColor: css(SUPPLY_COLORS[i % 4]), stack: "s", unit: "kW", borderColor: css("--panel"), borderWidth: { top: 1 }, barPercentage: 1, categoryPercentage: .9 }));
   const jColor = css(SUPPLY_COLORS[names.length % 4]);
   ds.push({ label: "JEPXスポット買", data: d.jepx_buy, backgroundColor: jColor, stack: "s", unit: "kW", borderColor: css("--panel"), borderWidth: { top: 1 }, barPercentage: 1, categoryPercentage: .9 });
@@ -307,7 +356,7 @@ function drawImb(d) {
 
 function renderTable(d) {
   const k = unit === "kwh" ? 0.5 : 1, u = unit === "kwh" ? "kWh" : "kW";
-  const names = DATA.supply_names;
+  const names = AREA.supply_names;
   const peakIdx = d.demand_plan.indexOf(Math.max(...d.demand_plan));
   let h = `<thead><tr><th class="l">コマ</th><th class="l">時刻帯</th><th>需要計画 ${u}</th><th>P10</th><th>P90</th>` +
     names.map(n => `<th>${n}</th>`).join("") + `<th>JEPX買</th><th>JEPX売</th><th>スポット 円/kWh</th>` +
@@ -323,11 +372,14 @@ function renderTable(d) {
 }
 
 function renderBacktest() {
-  const rows = DATA.days.filter(d => d.has_actual);
+  const rows = AREA.days.filter(d => d.has_actual);
+  const panel = document.getElementById("t-bt").closest("section");
+  panel.hidden = rows.length === 0;
+  if (!rows.length) return;
   const maxLoss = Math.max(...rows.map(d => d.summary["インバランス損失_万円"]));
   let h = `<thead><tr><th class="l">日付</th><th>需要実績 MWh</th><th>MAPE %</th><th>不足 MWh</th><th>余剰 MWh</th><th class="l">インバランス損失 万円</th></tr></thead><tbody>`;
   rows.forEach(d => {
-    const s = d.summary, i = DATA.days.indexOf(d);
+    const s = d.summary, i = AREA.days.indexOf(d);
     h += `<tr data-i="${i}" tabindex="0"><td class="l">${d.date}（${d.weekday}）</td><td>${fmt(s["需要実績_MWh"], 1)}</td><td>${fmt(s["MAPE_%"], 2)}</td><td>${fmt(s["不足インバランス_MWh"], 1)}</td><td>${fmt(s["余剰インバランス_MWh"], 1)}</td>` +
       `<td class="l">${fmt(s["インバランス損失_万円"], 1).padStart(5, " ")}<span class="bar" style="width:${(s["インバランス損失_万円"] / maxLoss * 120).toFixed(0)}px"></span></td></tr>`;
   });
@@ -351,8 +403,8 @@ function renderNote() {
 }
 
 function render() {
-  const d = DATA.days[current];
-  renderDays(); renderHeader(d); renderKpis(d);
+  const d = AREA.days[current];
+  renderAreas(); renderDays(); renderHeader(d); renderKpis(d);
   drawDemand(d); drawSupply(d); drawImb(d); renderTable(d);
 }
 
@@ -360,7 +412,7 @@ function render() {
   unit = u;
   document.getElementById("u-kw").setAttribute("aria-pressed", String(u === "kw"));
   document.getElementById("u-kwh").setAttribute("aria-pressed", String(u === "kwh"));
-  renderTable(DATA.days[current]);
+  renderTable(AREA.days[current]);
 }));
 
 renderBacktest(); renderNote(); render();

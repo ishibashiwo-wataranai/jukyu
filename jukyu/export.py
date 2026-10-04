@@ -26,15 +26,18 @@ def export_plan_csv(plan: pd.DataFrame, path: Path, bg_name: str) -> Path:
     return path
 
 
-def export_bid_csv(plan: pd.DataFrame, path: Path) -> Path:
-    """JEPXスポット入札の確認用一覧（入札量は kWh/h = 30分平均kW）。"""
+def export_bid_csv(plan: pd.DataFrame, path: Path, area_name: str) -> Path:
+    """JEPXスポット入札の確認用一覧（入札量は kWh/h = 30分平均kW）。
+
+    入札はエリアごとに行うため、どのエリアの入札かを「エリア」列に入れる。
+    """
     day = plan.index[0].strftime("%Y-%m-%d")
     rows = []
     for _, r in plan.iterrows():
         if r["JEPX買入札_kW"] > 0:
-            rows.append({"受渡日": day, "コマ": r["コマ"], "時刻帯": r["時刻帯"], "売買": "買", "価格_円per_kWh": r["買入札価格_円"], "入札量_kWh_per_h": r["JEPX買入札_kW"]})
+            rows.append({"エリア": area_name, "受渡日": day, "コマ": r["コマ"], "時刻帯": r["時刻帯"], "売買": "買", "価格_円per_kWh": r["買入札価格_円"], "入札量_kWh_per_h": r["JEPX買入札_kW"]})
         if r["JEPX売入札_kW"] > 0:
-            rows.append({"受渡日": day, "コマ": r["コマ"], "時刻帯": r["時刻帯"], "売買": "売", "価格_円per_kWh": r["売入札価格_円"], "入札量_kWh_per_h": r["JEPX売入札_kW"]})
+            rows.append({"エリア": area_name, "受渡日": day, "コマ": r["コマ"], "時刻帯": r["時刻帯"], "売買": "売", "価格_円per_kWh": r["売入札価格_円"], "入札量_kWh_per_h": r["JEPX売入札_kW"]})
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(path, index=False, encoding="utf-8-sig")
     return path
